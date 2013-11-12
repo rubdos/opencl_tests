@@ -44,7 +44,7 @@ int main(int argc, char ** argv)
     std::vector<cl::Platform> platformList;
     cl::Platform::get(&platformList);
     checkErr((platformList.size() != 0) ? CL_SUCCESS: -1, "cl::Platform::get");
-    std::cerr << platformList.size() << " devices found" << std::endl;
+    std::cerr << platformList.size() << " platforms found" << std::endl;
     for(int i = 0; i < platformList.size(); i++)
     {
         platformInfo inf(platformList[i]);
@@ -54,6 +54,12 @@ int main(int argc, char ** argv)
     if(platformList.size() > 1)
     {
         // Let user choose device
+        selectedi = -1;
+        while(selectedi > (platformList.size() - 1) or selectedi < 0)
+        {
+            std::cout << "Select a one: ";
+            std::cin >> selectedi;
+        }
     }
     cl::Platform &selected = platformList[selectedi];
     platformInfo inf(platformList[selectedi]);
