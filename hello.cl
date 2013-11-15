@@ -5,7 +5,8 @@ __kernel void hello(__global char* out)
     size_t tid = get_global_id(0);
     out[tid] = hw[tid];
 }
-__kernel void square(__global int* in, __global int* out)
+__kernel void square(__global short* in, __global short* out)
 {
-    *out = *in * *in;
+    size_t tid = get_global_id(0);
+    out[tid] = in[tid] * in[tid];
 }

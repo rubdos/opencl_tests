@@ -3,6 +3,9 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <cstdlib> // for rand()
+#include <ctime>
+#include <chrono>
 #include <iterator>
 
 #include <CL/cl.hpp>
@@ -111,23 +114,33 @@ int main(int argc, char ** argv)
             &err
             );
     checkErr(err, "Creating buffer");
+    
+    srand(time(NULL));
 
     // Buffers for the square kernel
-    int _in = 11;
-    int _out;
+    size_t COUNT = 1024 * 1024;
+    short *_in = new short[COUNT];
+    short *_out = new short[COUNT];
+    // Generate some random numbers.
+    // IDEA: TODO: let the gpu generate some random 
+    //             numbers!
+    for(size_t i = 0; i < COUNT; i++)
+    {
+        _in[i] = rand() % 30;
+    }
     cl::Buffer in(
             ctxt,
             CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,
-            sizeof(int),
-            &_in,
+            COUNT,
+            _in,
             &err
             );
     checkErr(err, "Creating buffer");
     cl::Buffer out(
             ctxt,
             CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,
-            sizeof(int),
-            &_out,
+            COUNT,
+            _out,
             &err
             );
     checkErr(err, "Creating buffer");
@@ -198,10 +211,14 @@ int main(int argc, char ** argv)
             NULL,
             &event1
             );
+    event1.wait();
+
+    // Lets time the squarings
+    auto t_cl_start = std::chrono::system_clock::now();
     err = queue.enqueueNDRangeKernel(
             kernel_square,
             cl::NullRange,
-            cl::NDRange(1), // just one int
+            cl::NDRange(COUNT), // all ints
             cl::NDRange(1,1),
             NULL,
             &event2
@@ -210,15 +227,16 @@ int main(int argc, char ** argv)
 
     // Wait for the processor to finish it's 
     // very difficult calculations
-    event1.wait();
+    std::cout << "Waiting for kernel to finish" << std::endl;
     event2.wait();
+    auto t_cl_end = std::chrono::system_clock::now();
 
     // Read out the values
     err = queue.enqueueReadBuffer(out, 
             CL_TRUE,
             0,
-            1, // just one int
-            &_out);
+            COUNT, // all ints
+            _out);
     checkErr(err, "Reading buffer");
     err = queue.enqueueReadBuffer(outCL, 
             CL_TRUE,
@@ -227,8 +245,25 @@ int main(int argc, char ** argv)
             outH);
     checkErr(err, "Reading buffer");
 
+    std::chrono::duration<double> cl_duration = t_cl_end - t_cl_start;
+
+    // Now measure stuff on CPU
+    int res[COUNT];
+    auto t_cpu_start = std::chrono::system_clock::now();
+    for(int i = 0; i < COUNT; i++)
+    {
+        res[i] = _in[i] * _in[i];
+    }
+    auto t_cpu_end = std::chrono::system_clock::now();
+    std::chrono::duration<double> cpu_duration = t_cpu_end - t_cpu_start;
+
     // Print out our precious results
-    std::cout << "Hello world kernel returns: " << outH
-        << _in << "^2=" << _out << std::endl;
+    std::cout << "Hello world kernel returns: " << outH;
+    std::cout << "Amount of squares done: " << COUNT << std::endl
+        << "Timings:" << std::endl
+        << " OCL: " << (cl_duration.count()) << "s" << std::endl
+        << " CPU: " << (cpu_duration.count()) << "s" << std::endl;
+//    for(size_t i = 0; i<COUNT; i++)
+//        std::cout << _in[i] << "^2=" << _out[i] << std::endl;
     return EXIT_SUCCESS;
 }
